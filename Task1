@@ -1,0 +1,74 @@
+# Import necessary libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import re
+import string
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# Download NLTK stopwords if not already installed
+nltk.download('stopwords')
+
+# Load your dataset (assuming you have a CSV with 'description' and 'genre' columns)
+data = pd.read_csv('movie_data.csv')
+
+# Data Preprocessing
+stop_words = set(stopwords.words('english'))
+stemmer = PorterStemmer()
+
+def preprocess_text(text):
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    
+    # Tokenization: split the text into words
+    words = text.split()
+    
+    # Lowercase and remove stopwords
+    words = [word.lower() for word in words if word.lower() not in stop_words]
+    
+    # Stemming: reduce words to their base form
+    words = [stemmer.stem(word) for word in words]
+    
+    # Join words back into a single string
+    return ' '.join(words)
+
+# Apply preprocessing to the 'description' column
+data['processed_description'] = data['description'].apply(preprocess_text)
+
+# Vectorize the text data using TF-IDF
+tfidf = TfidfVectorizer(max_features=5000)
+X = tfidf.fit_transform(data['processed_description']).toarray()
+
+# Encode genres (if they are not already numeric)
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+y = encoder.fit_transform(data['genre'])
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Initialize and train the Support Vector Classifier
+svm_model = SVC(kernel='linear')  # Using a linear kernel for text data
+svm_model.fit(X_train, y_train)
+
+# Predict genres on the test set
+y_pred = svm_model.predict(X_test)
+
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+# Classification report and confusion matrix for further analysis
+print("Classification Report:\n", classification_report(y_test, y_pred, target_names=encoder.classes_))
+sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues', xticklabels=encoder.classes_, yticklabels=encoder.classes_)
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
